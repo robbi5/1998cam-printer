@@ -4,6 +4,7 @@ const sumatra = fs.readdirSync('node_modules/pdf-to-printer/dist/').find(e => e.
 
 module.exports = {
   packagerConfig: {
+    asar: true, // or an object containing your asar options
     extraResource: [
       `node_modules/pdf-to-printer/dist/${sumatra}`,
       `node_modules/regedit/vbs`
@@ -36,6 +37,10 @@ module.exports = {
           ],
         },
       },
+    },
+    {
+      name: '@electron-forge/plugin-auto-unpack-natives',
+      config: {}
     },
   ],
 };

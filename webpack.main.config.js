@@ -10,6 +10,9 @@ module.exports = {
   module: {
     rules: require('./webpack.rules'),
   },
+  externals: {
+    sharp: "commonjs sharp",
+  },
   plugins: [
     new CopyPlugin({
       patterns: [{
