@@ -13,7 +13,7 @@ module.exports = {
   makers: [{
     name: '@electron-forge/maker-squirrel',
     config: {
-      name: 'label-terminal-win32-x64'
+      name: '1998cam-printer-win32-x64'
     }
   }],
   plugins: [
