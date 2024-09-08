@@ -1,8 +1,8 @@
 {
-  "name": "label-terminal",
-  "productName": "label-terminal",
+  "name": "1998cam-printer",
+  "productName": "1998cam-printer",
   "version": "1.0.0",
-  "description": "Eine besonders schräge Drucksoftware für Inventaraufkleber.",
+  "description": "Pulling gameboy camera photos to print them",
   "main": ".webpack/main",
   "scripts": {
     "start": "electron-forge start",
@@ -12,7 +12,7 @@
     "lint": "echo \"No linting configured\""
   },
   "keywords": [],
-  "author": "ech0",
+  "author": "robbi5 & ech0",
   "license": "MIT",
   "devDependencies": {
     "@electron-forge/cli": "^6.1.1",
@@ -38,5 +38,5 @@
     "update-electron-app": "^2.0.1",
     "yaml": "^2.2.2"
   },
-  "repository": "github:temporaerhaus/label-terminal"
+  "repository": "github:robbi5/1998cam-printer"
 }
