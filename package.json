@@ -32,10 +32,10 @@
   "dependencies": {
     "@electron-forge/plugin-auto-unpack-natives": "^7.4.0",
     "electron-squirrel-startup": "^1.0.0",
+    "jimp": "^1.4.0",
     "pdf-to-printer": "^5.6.0",
     "pdfmake": "^0.2.7",
     "regedit": "^5.1.2",
-    "sharp": "^0.33.5",
     "update-electron-app": "^2.0.1"
   },
   "repository": "github:robbi5/1998cam-printer"

@@ -1,7 +1,7 @@
 import './index.css';
 
 import pdfMake from 'pdfmake/build/pdfmake';
-import sharp from 'sharp';
+import { Jimp } from "jimp";
 
 
 pdfMake.fonts = {
@@ -102,28 +102,27 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     for (const [id, item] of Object.entries(queue)) {
       const res = await fetch(item.image_url);
-      const resBuffer = await res.buffer();
+      const resBuffer = await res.arrayBuffer();
 
-      const image = sharp(resBuffer).resize({
-          width: 640,
-          kernel: 'nearest'
-        })
-        // .withMetadata()
-        .toFormat('png')
-        .toBuffer();
+      if (typeof resBuffer === 'undefined') {
+        console.error('buffer is undefined');
+        continue;
+      }
 
-      // convert image to data uri
-      const img = `data:image/png;base64,${image.toString('base64')}`;
+      const image = await Jimp.fromBuffer(resBuffer);
+      // 160x144 * 3
+      const SCALE = 3.5;
+      image.scaleToFit({ h: 160*SCALE, w: 144*SCALE, mode: "nearestNeighbor" });
+      image.rotate(90);
+      const b64 = await image.getBase64("image/png");
+
+      console.log(b64);
 
       content.push({
-        columnGap: 0,
-        margins: 0,
-        columns: [{
-          image: img,
-          margin: [mm2pt(5), mm2pt(5)],
-          width: mm2pt(200),
-          style: 'centerme'
-        }],
+        image: b64,
+        //margin: [0, mm2pt(18)],
+        // width: mm2pt(100),
+        alignment: 'center',
         pageBreak: 'before'
       });
     }
@@ -131,12 +130,12 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (content.length > 0) {
       delete content[0].pageBreak;
       const pdf = pdfMake.createPdf({
+        // pageOrientation: 'portrait',
+        pageMargins: 0,
         pageSize: {
           width: mm2pt(216),
-          height: mm2pt(120),
+          height: mm2pt(180),
         },
-        pageOrientation: 'portrait',
-        pageMargins: 0,
 
         defaultStyle: {
           font: 'freemono',
@@ -144,12 +143,6 @@ window.addEventListener('DOMContentLoaded', async () => {
         },
 
         content: content,
-        
-        styles: {
-          centerme: {
-            alignment: 'center'
-          }
-        },
       });
 
       pdf.getDataUrl((res) => {
@@ -175,7 +168,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const button = document.createElement('button');
     button.innerText = '🗑';
     button.addEventListener('click', () => {
-      item.remove()
+      itemEl.remove();
       delete queue[id];
       localStorage.setItem('queue', JSON.stringify(queue));
     });
@@ -199,7 +192,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   try {
     const restored = JSON.parse(localStorage.getItem('queue'));
-    for (const item of Object.keys(restored)) {
+    for (const item of restored) {
       await queueItem(item);
     }
   } catch {
