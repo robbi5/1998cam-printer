@@ -1,5 +1,4 @@
 import './index.css';
-import YAML from 'yaml';
 
 import QRCode from 'qrcode';
 import logo from './logo.svg';
@@ -16,98 +15,20 @@ function mm2pt(mm) {
   return mm / 25.4 * 72;
 }
 
-function textMaxWidth(content) {
-  return new Promise((resolve) => pdfMake.createPdf({
-    defaultStyle: { font: 'freemono' },
-    content: [{text: content, noWrap: true }],
-    pageMargins: [0, 0, 0, 0],
-  }).getStream({}, d => resolve(d.x)));
-}
-
 async function truncateText(text, options) {
-  const { maxWidth, fontSize } = options;
-  const { length } = text;
-  let b = length;
-  const trunc = (len) => {
-    len = Math.max(Math.round(len, 0), 1);
-    return len < length ? `${text.slice(0, len - 1)}…` : text;
-  };
-  const f = async (len) => (await textMaxWidth({ text: trunc(len), fontSize, })) - maxWidth;
-  let bx = await f(b);
-  if (bx > 0) {
-    let a = 0, ax = await f(0);
-    if (ax >= 0) {
-      return '…';
-    }
-    if (Math.abs(ax) < Math.abs(bx)) {
-      [a, ax, b, bx] = [b, bx, a, ax];
-    }
-    const xTol = 1;
-    let c = a, cx = ax, mflag = true, d, maxIter = 20;
-    while (maxIter-- && Math.abs(b - a) > xTol) {
-      const acx = ax - cx;
-      const bcx = bx - cx;
-      const abx = ax - bx;
-      let s = Math.abs(acx) > Number.EPSILON && Math.abs(bcx) > Number.EPSILON ?
-        a * bx * cx / (abx * acx) + b * ax * cx / (-abx * bcx) + c * ax * bx / (acx * bcx) :
-        b - bx * (b - a) / (bx - ax);
-      if (s < (3 * a + b) / 4 || s > b || (
-        mflag ?
-          (Math.abs(s - b) >= Math.abs(b - c) / 2 || Math.abs(b - c) < Math.abs(2 * Number.EPSILON * Math.abs(b))) :
-          (Math.abs(s - b) >= Math.abs(c - d) / 2 || Math.abs(c - d) < Math.abs(2 * Number.EPSILON * Math.abs(b)))
-      )) {
-        s = (a + b) / 2;
-        mflag = true;
-      } else {
-        mflag = false;
-      }
-
-      const sx = await f(s);
-      [d, c, cx] = [c, b, bx];
-      if (ax * sx < 0) {
-        [b, bx] = [s, sx];
-      } else {
-        [a, ax] = [s, sx];
-      }
-
-      if (Math.abs(ax) < Math.abs(bx)) {
-        [a, ax, b, bx] = [b, bx, a, ax];
-      }
-    }
-    return trunc(ax < bx ? a : b);
-  }
   return text;
 };
 
 async function shortenDescription(text, options) {
-  const output = [];
-  const stack = text.split('\n');
-
-  while (stack.length > 0 && output.length < options.maxLines) {
-    let line = stack.shift();
-    const tmp = await truncateText(line, options);
-    const pos = tmp.indexOf('…');
-    if (pos >= 0) {
-      output.push(tmp.slice(0, pos));
-      stack.unshift(line.slice(pos));
-    } else if (tmp.length > 0) {
-      output.push(tmp);
-    }
-  }
-
-  return output.filter(e => e).slice(0, options.maxLines + 1).join('\n');
-}
+  return text;
+};
 
 window.addEventListener('DOMContentLoaded', async () => {
-  document.getElementById('logo').src = `data:image/svg+xml;base64,${btoa(logo)}`;
   const printerSelect = document.getElementById('setting-printer');
-  const input = document.getElementById('scan');
-  const parser = new DOMParser();
   const queue = {};
 
   const cAlert = (msg) => new Promise((resolve) => {
     document.getElementById('dialog').addEventListener('close', (e) => {
-      window.requestAnimationFrame(() => window.requestAnimationFrame(() => input.focus()));
       resolve(e.target.returnValue);
     }, { once: true });
     document.getElementById('dialog-message').innerText = msg;
@@ -157,17 +78,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     await cAlert(error);
     document.querySelector('iframe').src = '';
     document.querySelector('iframe').style.display = 'none';
-    window.requestAnimationFrame(() => window.requestAnimationFrame(() => input.focus()));
   });
   window.electronAPI.onClear((event, small) => {
     const undo = [];
     for (const [id, item] of Object.entries(queue)) {
-      if (item.yaml.small && !small) {
-        continue;
-      } else if (!item.yaml.small && small) {
-        continue;
-      }
-
       delete queue[id];
       document.getElementById(id).remove();
       undo.push(id);
@@ -178,7 +92,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     localStorage.setItem('undo', JSON.stringify(undo));
   });
 
-  const printNow = async (small=false) => {
+  const printNow = async () => {
+    const small = false;
     if (!settings.printer) {
       return;
     }
@@ -186,14 +101,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     const content = [];
 
     for (const [id, item] of Object.entries(queue)) {
-      if (!item.yaml) {
-        continue;
-      } else if (item.yaml.small && !small) {
-        continue;
-      } else if (!item.yaml.small && small) {
-        continue;
-      }
-
       const svg = await new Promise((resolve, reject) => QRCode.toString(id, {
         version: 1,
         margin: 0,
@@ -292,45 +199,17 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
-  const queueItem = async (inventoryId) => {
-    const res = await fetch(`https://wiki.temporaerhaus.de/inventar/${inventoryId}`);
+  const queueItem = async (item) => {
+    const id = item.uuid;
 
-    if (res.status !== 200) {
-      throw new Error(`${res.status} ${res.statusText}`);
-    }
+    const itemEl = document.createElement('li');
+    itemEl.id = id;
 
-    const body = await res.text();
-    const doc = parser.parseFromString(body, 'text/html');
-
-    const id = inventoryId.toUpperCase();
-    const title = doc.querySelector('#dokuwiki__content h1')?.innerText || '';
-    const yaml = [...doc.querySelectorAll('#dokuwiki__content .code.yaml')]
-      .map(e => YAML.parse(e.innerText))
-      .find(e => e.inventory);
-
-    if (id.startsWith('L-') && yaml.owner) {
-      yaml.description = `Besitzer*in: ${yaml.owner}\n${yaml.description}`;
-    }
-
-    if (yaml.serial) {
-      yaml.description = `S/N: ${yaml.serial}\n${yaml.description}`;
-    }
-
-    const item = document.createElement('li');
-    item.id = id;
-
-    const bold = document.createElement('b');
-    bold.style.marginRight = '1em';
-    bold.innerText = id;
-    if (yaml.small) {
-      bold.innerText += ' 🤏';
-    }
-
-    const label = document.createElement('div');
-    label.innerText = title;
+    const img = document.createElement('img');
+    img.src = item.image_url;
 
     const description = document.createElement('small');
-    description.innerText = yaml.description;
+    description.innerText = item.timestamp;
 
     const button = document.createElement('button');
     button.innerText = '🗑';
@@ -338,18 +217,10 @@ window.addEventListener('DOMContentLoaded', async () => {
       item.remove()
       delete queue[id];
       localStorage.setItem('queue', JSON.stringify(queue));
-      input.focus();
     });
 
-    const refresh = document.createElement('button');
-    refresh.innerText = '🔄️';
-    refresh.className = 'refresh';
-    refresh.addEventListener('click', () => queueItem(id));
-
-    item.appendChild(refresh);
     item.appendChild(button);
-    item.appendChild(bold);
-    item.appendChild(label);
+    item.appendChild(img);
     item.appendChild(description);
 
     const tmp = document.getElementById(id);
@@ -361,111 +232,37 @@ window.addEventListener('DOMContentLoaded', async () => {
       tmp.remove();
     }
 
-    queue[id] = {
-      id: id,
-      title: title,
-      yaml: yaml
-    };
+    queue[id] = item;
     localStorage.setItem('queue', JSON.stringify(queue));
-    input.focus();
   };
 
   try {
     const restored = JSON.parse(localStorage.getItem('queue'));
-    for (const id of Object.keys(restored)) {
-      await queueItem(id);
+    for (const item of Object.keys(restored)) {
+      await queueItem(item);
     }
   } catch {
     // ignore
   }
 
-  input.addEventListener('blur', (e) => {
-    if (e.relatedTarget?.tagName === 'BUTTON') {
-      return;
-    }
-    input.focus();
-  });
-
-  input.addEventListener('keydown', async (evt) => {
-    if (evt.keyCode === 13 || evt.key === 'Enter') {
-      input.disabled = true;
-      evt.preventDefault();
-
-      try {
-        if (input.value === 'PRINT') {
-          printNow(false);
-          return;
-        } else if (input.value === 'PRINT_SMALL') {
-          printNow(true);
-          return;
-        }
-
-        await queueItem(input.value);
-      } catch (e) {
-        await cAlert(e.message);
-      } finally {
-        input.disabled = false;
-        input.value = '';
-
-        window.requestAnimationFrame(() => window.requestAnimationFrame(() => input.focus()));
-      }
-    }
-  });
-
-  document.querySelector('#print').addEventListener('click', () => printNow(false));
-  document.querySelector('#print-small').addEventListener('click', () => printNow(true));
+  document.querySelector('#print').addEventListener('click', () => printNow());
 
   setInterval(async () => {
-    const res = await fetch('https://wiki.temporaerhaus.de/inventar/print-queue?do=edit');
-    const html = await res.text();
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    const data = new FormData(doc.querySelector('form[method="post"]'));
-
-    const lines = data.get('wikitext').split('\n');
-    const items = lines.filter(e => e.startsWith('  *'));
-
-    if (items.length === 0 || !(await window.electronAPI.isProduction())) {
-      // nothing to do
-      return;
+    const res = await fetch('https://1998.cam/printqueue/print');
+    const json = await res.json();
+    
+    if (json.status !== 'success') {
+      return
     }
 
-    data.set('wikitext', lines.filter(e => !e.startsWith('  *')).join('\n'));
-    data.set('summary', 'empty queue');
-    data.set('do[save]', '1');
-
-    await fetch('https://wiki.temporaerhaus.de/inventar/print-queue?do=edit', {
-      method: 'post',
-      body: data
-    });
-
-    items.forEach(e => queueItem(e.slice(3).trim()));
+    queueItem(json.queueitem);
   }, 10000);
-
-  document.getElementById('save-exit').addEventListener('click', async () => {
-    const res = await fetch('https://wiki.temporaerhaus.de/inventar/print-queue?do=edit');
-    const html = await res.text();
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    const data = new FormData(doc.querySelector('form[method="post"]'));
-
-    data.set('wikitext', `${data.get('wikitext')}\n${Object.keys(queue).map(e => `  * ${e}`).join('\n')}`);
-    data.set('summary', 'save queue');
-    data.set('do[save]', '1');
-
-    await fetch('https://wiki.temporaerhaus.de/inventar/print-queue?do=edit', {
-      method: 'post',
-      body: data
-    });
-
-    window.electronAPI.quit();
-  });
 
   document.getElementById('undo').addEventListener('click', async () => {
     try {
       const items = JSON.parse(localStorage.getItem('undo'));
-      for (const id of items) {
-        await queueItem(id);
+      for (const item of items) {
+        await queueItem(item);
       }
     } catch (e) {
       await cAlert(e.message);

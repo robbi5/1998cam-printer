@@ -80,7 +80,7 @@ const createWindow = () => {
       await print(file.path, {
         printer: settings.printer,
         printDialog: settings.printDialog,
-        orientation: 'landscape',
+        orientation: 'portrait',
         scale: 'fit',
         silent: false,
         copies: 1
