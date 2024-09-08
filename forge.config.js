@@ -13,7 +13,7 @@ module.exports = {
   makers: [{
     name: '@electron-forge/maker-squirrel',
     config: {
-      name: 'label-terminal-win32-ia32'
+      name: 'label-terminal-win32-x64'
     }
   }],
   plugins: [
@@ -22,7 +22,6 @@ module.exports = {
       config: {
         mainConfig: './webpack.main.config.js',
         devContentSecurityPolicy: `default-src * data: blob: filesystem: about: ws: wss: 'unsafe-inline' 'unsafe-eval'`,
-        // I gave up `default-src 'self' https://wiki.temporaerhaus.de https://cdn.jsdelivr.net/ 'unsafe-eval' 'unsafe-inline'`,
         renderer: {
           config: './webpack.renderer.config.js',
           entryPoints: [
