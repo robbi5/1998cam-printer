@@ -33,10 +33,9 @@
     "electron-squirrel-startup": "^1.0.0",
     "pdf-to-printer": "^5.6.0",
     "pdfmake": "^0.2.7",
-    "qrcode": "^1.5.3",
     "regedit": "^5.1.2",
     "update-electron-app": "^2.0.1",
-    "yaml": "^2.2.2"
+    "sharp": "^0.33.5"
   },
   "repository": "github:robbi5/1998cam-printer"
 }

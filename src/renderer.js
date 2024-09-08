@@ -1,8 +1,8 @@
 import './index.css';
 
-import QRCode from 'qrcode';
-import logo from './logo.svg';
 import pdfMake from 'pdfmake/build/pdfmake';
+import sharp from 'sharp';
+
 
 pdfMake.fonts = {
   freemono: {
@@ -70,7 +70,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 
     document.querySelector('#settings-toggle').disabled = false;
-    document.querySelector('#print-small').disabled = false;
     document.querySelector('#print').disabled = false;
   });
 
@@ -79,9 +78,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.querySelector('iframe').src = '';
     document.querySelector('iframe').style.display = 'none';
   });
-  window.electronAPI.onClear((event, small) => {
+  window.electronAPI.onClear(async (event) => {
     const undo = [];
     for (const [id, item] of Object.entries(queue)) {
+      await fetch(item.url, { method: 'DELETE' });
+
       delete queue[id];
       document.getElementById(id).remove();
       undo.push(id);
@@ -93,7 +94,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   });
 
   const printNow = async () => {
-    const small = false;
     if (!settings.printer) {
       return;
     }
@@ -101,73 +101,28 @@ window.addEventListener('DOMContentLoaded', async () => {
     const content = [];
 
     for (const [id, item] of Object.entries(queue)) {
-      const svg = await new Promise((resolve, reject) => QRCode.toString(id, {
-        version: 1,
-        margin: 0,
-        type: 'svg',
-        mode: 'alphanumeric',
-        errorCorrectionLevel: 'Q'
-      }, (err, data) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(data);
-        }
-      }));
+      const res = await fetch(item.image_url);
+      const resBuffer = await res.buffer();
+
+      const image = sharp(resBuffer).resize({
+          width: 640,
+          kernel: 'nearest'
+        })
+        // .withMetadata()
+        .toFormat('png')
+        .toBuffer();
+
+      // convert image to data uri
+      const img = `data:image/png;base64,${image.toString('base64')}`;
 
       content.push({
-        columnGap: mm2pt(.5),
+        columnGap: 0,
         margins: 0,
-        columns: small ? [{
-          svg: svg,
-          width: mm2pt(10),
-          margin: [mm2pt(0), mm2pt(1), mm2pt(3), mm2pt(1)],
-        }, {
-          width: '*',
-          margin: [mm2pt(1), mm2pt(.3), mm2pt(1), mm2pt(3)],
-          stack: [{
-            bold: true,
-            fontSize: 7,
-            text: id.toUpperCase(),
-            margin: [mm2pt(0), mm2pt(0), mm2pt(0), mm2pt(.1)]
-          }, {
-            text: await truncateText(item.title, { fontSize: 6, maxWidth: mm2pt(50 - 10 - 7.5 - 3) }),
-            fontSize: 6,
-            margin: [mm2pt(0), mm2pt(0), mm2pt(0), mm2pt(.1)],
-          }, {
-            text: await shortenDescription(item.yaml?.description || '', { fontSize: 6, maxWidth: mm2pt(50 - 10 - 7.5 - 3), maxLines: 2 }),
-            lineHeight: .8,
-            fontSize: 6
-          }]
-        }, {
-          svg: logo,
-          margin: [mm2pt(0), mm2pt(1)],
-          width: mm2pt(7.5)
-        }] : [{
-          svg: svg,
-          width: mm2pt(18),
-          margin: [mm2pt(0), mm2pt(3), mm2pt(3), mm2pt(3)],
-        }, {
-          width: '*',
-          margin: [mm2pt(3), mm2pt(1.7), mm2pt(2), mm2pt(3)],
-          stack: [{
-            bold: true,
-            fontSize: 11,
-            text: id.toUpperCase(),
-            margin: [mm2pt(0), mm2pt(0), mm2pt(0), mm2pt(.5)]
-          }, {
-            fontSize: 9,
-            text: await truncateText(item.title, { fontSize: 9, maxWidth: mm2pt(90 - 18 - 13.45 - 2) }),
-            margin: [mm2pt(0), mm2pt(0), mm2pt(0), mm2pt(.5)],
-          }, {
-            text: await shortenDescription(item.yaml?.description || '', { fontSize: 8, maxWidth: mm2pt(90 - 18 - 13.45 - 2), maxLines: 3 }),
-            lineHeight: .8,
-            fontSize: 8
-          }]
-        }, {
-          svg: logo,
-          margin: [mm2pt(0), mm2pt(3)],
-          width: mm2pt(13.45)
+        columns: [{
+          image: img,
+          margin: [mm2pt(5), mm2pt(5)],
+          width: mm2pt(200),
+          style: 'centerme'
         }],
         pageBreak: 'before'
       });
@@ -177,10 +132,10 @@ window.addEventListener('DOMContentLoaded', async () => {
       delete content[0].pageBreak;
       const pdf = pdfMake.createPdf({
         pageSize: {
-          width: small ? mm2pt(50) : mm2pt(95),
-          height: small ? mm2pt(12) : mm2pt(24)
+          width: mm2pt(216),
+          height: mm2pt(120),
         },
-        pageOrientation: 'landscape',
+        pageOrientation: 'portrait',
         pageMargins: 0,
 
         defaultStyle: {
@@ -188,15 +143,19 @@ window.addEventListener('DOMContentLoaded', async () => {
           fontSize: 9,
         },
 
-        content: content
+        content: content,
+        
+        styles: {
+          centerme: {
+            alignment: 'center'
+          }
+        },
       });
 
       pdf.getDataUrl((res) => {
         document.querySelector('iframe').style.display = 'block';
         document.querySelector('iframe').src = res;
-        window.electronAPI.print(res, settings, small);
-
-        // FIXME: send DELETE /printqueue/{item.uuid} after print
+        window.electronAPI.print(res, settings);
       });
     }
   };

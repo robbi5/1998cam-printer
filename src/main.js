@@ -42,12 +42,13 @@ const createWindow = () => {
     });
   });
 
-  ipcMain.on('print', async (event, url, settings, small) => {
+  ipcMain.on('print', async (event, url, settings) => {
     try {
       const file = await tmp.file({ postfix: '.pdf', keep: true });
       await fs.writeFile(file.path, Buffer.from(url.slice(url.indexOf(',') + 1), 'base64'));
 
       // update registry
+      /*
       try {
         await new Promise((resolve, reject) => regedit.putValue({
           'HKCU\\Printers\\DevModePerUser': {
@@ -66,12 +67,13 @@ const createWindow = () => {
       } catch (e) {
         mainWindow.webContents.send('error', `Registry hack didn't work (${e.message})`);
       }
+      */
 
       if (!settings || typeof settings !== 'object') {
         settings = {};
       }
       if (!settings?.printer) {
-        settings.printer = 'Brother PT-P710BT';
+        settings.printer = 'CustomKPM216H';
       }
       if (!settings?.printDialog) {
         settings.printDialog = false;
@@ -86,7 +88,7 @@ const createWindow = () => {
         copies: 1
       });
 
-      mainWindow.webContents.send('clear', small);
+      mainWindow.webContents.send('clear');
       await file.cleanup();
     } catch (e) {
       mainWindow.webContents.send('error', e.message);
