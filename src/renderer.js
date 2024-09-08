@@ -195,6 +195,8 @@ window.addEventListener('DOMContentLoaded', async () => {
         document.querySelector('iframe').style.display = 'block';
         document.querySelector('iframe').src = res;
         window.electronAPI.print(res, settings, small);
+
+        // FIXME: send DELETE /printqueue/{item.uuid} after print
       });
     }
   };
@@ -219,16 +221,16 @@ window.addEventListener('DOMContentLoaded', async () => {
       localStorage.setItem('queue', JSON.stringify(queue));
     });
 
-    item.appendChild(button);
-    item.appendChild(img);
-    item.appendChild(description);
+    itemEl.appendChild(button);
+    itemEl.appendChild(img);
+    itemEl.appendChild(description);
 
     const tmp = document.getElementById(id);
     if (!tmp || !queue[id]) {
-      document.getElementById('queue').insertAdjacentElement('afterbegin', item);
+      document.getElementById('queue').insertAdjacentElement('afterbegin', itemEl);
     } else {
       tmp.id = 'deleting';
-      tmp.insertAdjacentElement('beforebegin', item);
+      tmp.insertAdjacentElement('beforebegin', itemEl);
       tmp.remove();
     }
 
